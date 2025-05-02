@@ -136,9 +136,10 @@ document.addEventListener("DOMContentLoaded", function() {
       ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
     });
     
-    // Create a download link and trigger the download
+    const name = prompt("Enter file name", "pixel-art");
+    if (!name) return;
     const link = document.createElement("a");
-    link.download = "pixel-art.png";
+    link.download = name.endsWith(".png") ? name : name + ".png";
     link.href = canvas.toDataURL();
     link.click();
   });

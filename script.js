@@ -1,149 +1,223 @@
-document.addEventListener("DOMContentLoaded", function() {
-  const grid = document.getElementById("grid");
-  const colorPicker = document.getElementById("colorPicker");
-  const toolSelect = document.getElementById("toolSelect");
-  const clearBtn = document.getElementById("clearBtn");
-  const resizeBtn = document.getElementById("resizeBtn");
-  const gridSizeInput = document.getElementById("gridSizeInput");
-  const toggleGridBtn = document.getElementById("toggleGridBtn");
-  const saveBtn = document.getElementById("saveBtn");
-  
-  let currentGridSize = parseInt(gridSizeInput.value) || 16;
+document.addEventListener("DOMContentLoaded", () => {
+  const grid             = document.getElementById("grid");
+  const colorPicker      = document.getElementById("colorPicker");
+  const toolSelect       = document.getElementById("toolSelect");
+  const brushSizeInput   = document.getElementById("brushSizeInput");
+  const clearBtn         = document.getElementById("clearBtn");
+  const resizeBtn        = document.getElementById("resizeBtn");
+  const gridSizeInput    = document.getElementById("gridSizeInput");
+  const toggleGridBtn    = document.getElementById("toggleGridBtn");
+  const saveBtn          = document.getElementById("saveBtn");
+  const undoBtn          = document.getElementById("undoBtn");
+  const redoBtn          = document.getElementById("redoBtn");
+  const projectNameInput = document.getElementById("projectNameInput");
+  const saveProjectBtn   = document.getElementById("saveNewProjectBtn");
+  const goToProjectsBtn  = document.getElementById("goToProjectsBtn");
+
+  let currentGridSize  = parseInt(gridSizeInput.value, 10) || 32;
   let gridLinesVisible = true;
-  
-  // Create the grid based on current grid size
+  let editingProject   = null;
+
+  const undoStack    = [];
+  const redoStack    = [];
+  const maxStackSize = 50;
+  const STORAGE_KEY  = "pixelArtProjects";
+
+  // Load/save multiple projects
+  function getProjects() {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  }
+  function setProjects(arr) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+  }
+
+  // Undo/redo helpers
+  function saveState() {
+    const state = Array.from(grid.children).map(c => c.style.backgroundColor);
+    undoStack.push(state);
+    if (undoStack.length > maxStackSize) undoStack.shift();
+    redoStack.length = 0;
+  }
+  function restoreState(state) {
+    grid.querySelectorAll(".cell")
+        .forEach((c,i) => c.style.backgroundColor = state[i]);
+  }
+  function undo() {
+    if (!undoStack.length) return;
+    const current = Array.from(grid.children).map(c => c.style.backgroundColor);
+    redoStack.push(current);
+    restoreState(undoStack.pop());
+  }
+  function redo() {
+    if (!redoStack.length) return;
+    const current = Array.from(grid.children).map(c => c.style.backgroundColor);
+    undoStack.push(current);
+    restoreState(redoStack.pop());
+  }
+
+  // Build the grid
   function createGrid(size) {
     grid.innerHTML = "";
-    grid.style.gridTemplateColumns = `repeat(${size}, 20px)`;
-    grid.style.gridTemplateRows = `repeat(${size}, 20px)`;
-    
-    for (let i = 0; i < size * size; i++) {
+    grid.style.gridTemplateColumns = `repeat(${size},20px)`;
+    grid.style.gridTemplateRows    = `repeat(${size},20px)`;
+    for (let i = 0; i < size*size; i++) {
       const cell = document.createElement("div");
-      cell.classList.add("cell");
-      if (!gridLinesVisible) {
-        cell.style.border = "none";
-      }
-      
-      // Paint or apply tool on cell mousedown
-      cell.addEventListener("mousedown", function(e) {
+      cell.className = "cell";
+      if (!gridLinesVisible) cell.style.border = "none";
+      cell.addEventListener("mousedown", e => {
         e.preventDefault();
-        handleCellAction(cell);
+        saveState();
+        paint(cell);
       });
-      
-      // Paint or apply tool while dragging the mouse
-      cell.addEventListener("mouseover", function(e) {
-        if (e.buttons === 1) {
-          handleCellAction(cell);
-        }
+      cell.addEventListener("mouseover", e => {
+        if (e.buttons === 1) paint(cell);
       });
-      
       grid.appendChild(cell);
     }
   }
-  
-  // Choose what happens when you interact with a cell based on the selected tool
-  function handleCellAction(cell) {
-    const tool = toolSelect.value;
-    if (tool === "brush") {
-      cell.style.backgroundColor = colorPicker.value;
-    } else if (tool === "eraser") {
-      cell.style.backgroundColor = "white";
-    } else if (tool === "fill") {
-      floodFill(cell, colorPicker.value);
-    }
+
+  // Paint according to tool
+  function paint(cell) {
+    const tool  = toolSelect.value;
+    const size  = parseInt(brushSizeInput.value,10) || 1;
+    const color = colorPicker.value;
+    if (tool === "brush")      stampSquare(cell, color, size);
+    else if (tool === "eraser")stampSquare(cell, "#fff", size);
+    else if (tool === "fill")   floodFill(cell, color);
   }
-  
-  // A simple flood fill (bucket) tool to fill adjacent cells of the same color
-  function floodFill(startCell, newColor) {
-    const originalColor = startCell.style.backgroundColor;
-    if (originalColor === newColor) return;
-    
-    const cells = Array.from(grid.children);
-    const size = currentGridSize;
-    
-    function getCellIndex(cell) {
-      return cells.indexOf(cell);
-    }
-    
-    function getNeighbors(index) {
-      const neighbors = [];
-      const row = Math.floor(index / size);
-      const col = index % size;
-      if (col > 0) neighbors.push(index - 1);
-      if (col < size - 1) neighbors.push(index + 1);
-      if (row > 0) neighbors.push(index - size);
-      if (row < size - 1) neighbors.push(index + size);
-      return neighbors;
-    }
-    
-    const queue = [getCellIndex(startCell)];
-    while (queue.length > 0) {
-      const index = queue.shift();
-      const cell = cells[index];
-      if (cell.style.backgroundColor === originalColor) {
-        cell.style.backgroundColor = newColor;
-        const neighbors = getNeighbors(index);
-        neighbors.forEach(nIndex => {
-          if (cells[nIndex].style.backgroundColor === originalColor) {
-            queue.push(nIndex);
-          }
-        });
+
+  // Square stamp for brush/eraser
+  function stampSquare(cell, color, size) {
+    const cells = Array.from(grid.children),
+          idx   = cells.indexOf(cell),
+          row   = Math.floor(idx/currentGridSize),
+          col   = idx % currentGridSize,
+          half  = Math.floor(size/2);
+    for (let dy=-half; dy<=half; dy++) {
+      for (let dx=-half; dx<=half; dx++) {
+        const r = row+dy, c = col+dx;
+        if (r>=0 && r<currentGridSize && c>=0 && c<currentGridSize) {
+          cells[r*currentGridSize + c].style.backgroundColor = color;
+        }
       }
     }
   }
-  
-  // Clear all cells to white
-  clearBtn.addEventListener("click", function() {
-    const cells = document.querySelectorAll(".cell");
-    cells.forEach(cell => {
-      cell.style.backgroundColor = "white";
-    });
+
+  // Flood fill (bucket)
+  function floodFill(start, newColor) {
+    const orig = start.style.backgroundColor;
+    if (orig === newColor) return;
+    const cells = Array.from(grid.children),
+          queue = [cells.indexOf(start)];
+    while (queue.length) {
+      const i = queue.shift(), cell = cells[i];
+      if (cell.style.backgroundColor !== orig) continue;
+      cell.style.backgroundColor = newColor;
+      const row = Math.floor(i/currentGridSize),
+            col = i % currentGridSize;
+      [[row,col-1],[row,col+1],[row-1,col],[row+1,col]]
+        .forEach(([r,c]) => {
+          if (r>=0 && r<currentGridSize && c>=0 && c<currentGridSize) {
+            const ni = r*currentGridSize + c;
+            if (cells[ni].style.backgroundColor === orig) queue.push(ni);
+          }
+        });
+    }
+  }
+
+  // Button events
+  clearBtn.addEventListener("click", () => {
+    saveState();
+    grid.querySelectorAll(".cell").forEach(c => c.style.backgroundColor = "#fff");
   });
-  
-  // Resize the grid based on the input value
-  resizeBtn.addEventListener("click", function() {
-    const newSize = parseInt(gridSizeInput.value);
-    if (newSize && newSize > 0) {
-      currentGridSize = newSize;
-      createGrid(currentGridSize);
+  resizeBtn.addEventListener("click", () => {
+    const s = parseInt(gridSizeInput.value,10);
+    if (s>=5 && s<=64) {
+      currentGridSize = s;
+      createGrid(s);
     }
   });
-  
-  // Toggle the visibility of grid lines
-  toggleGridBtn.addEventListener("click", function() {
+  toggleGridBtn.addEventListener("click", () => {
     gridLinesVisible = !gridLinesVisible;
-    const cells = document.querySelectorAll(".cell");
-    cells.forEach(cell => {
-      cell.style.border = gridLinesVisible ? "1px solid #ddd" : "none";
+    grid.querySelectorAll(".cell").forEach(c => {
+      c.style.border = gridLinesVisible ? null : "none";
     });
   });
-  
-  // Save the current pixel art as an image
-  saveBtn.addEventListener("click", function() {
-    const cellSize = 20;
-    const canvas = document.createElement("canvas");
-    canvas.width = currentGridSize * cellSize;
-    canvas.height = currentGridSize * cellSize;
+  saveBtn.addEventListener("click", () => {
+    const cs = 20, canvas = document.createElement("canvas");
+    canvas.width  = currentGridSize * cs;
+    canvas.height = currentGridSize * cs;
     const ctx = canvas.getContext("2d");
-    const cells = Array.from(grid.children);
-    
-    cells.forEach((cell, i) => {
-      const row = Math.floor(i / currentGridSize);
-      const col = i % currentGridSize;
-      // Use white as default if no color is set
-      const color = cell.style.backgroundColor || "white";
-      ctx.fillStyle = color;
-      ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+    grid.querySelectorAll(".cell").forEach((c,i) => {
+      ctx.fillStyle = c.style.backgroundColor || "#fff";
+      const r = Math.floor(i/currentGridSize),
+            col = i % currentGridSize;
+      ctx.fillRect(col*cs, r*cs, cs, cs);
     });
-    
-    const name = prompt("Enter file name", "pixel-art");
-    if (!name) return;
     const link = document.createElement("a");
-    link.download = name.endsWith(".png") ? name : name + ".png";
+    link.download = "pixel-art.png";
     link.href = canvas.toDataURL();
     link.click();
   });
-  
-  // Create the initial grid
-  createGrid(currentGridSize);
+  undoBtn.addEventListener("click", undo);
+  redoBtn.addEventListener("click", redo);
+  document.addEventListener("keydown", e => {
+    if (e.ctrlKey && e.key === "z") { e.preventDefault(); undo(); }
+    if (e.ctrlKey && e.key === "y") { e.preventDefault(); redo(); }
+  });
+
+  // Save or update project
+  saveProjectBtn.addEventListener("click", () => {
+    const nameInput = projectNameInput.value.trim();
+    const projects  = getProjects();
+
+    if (editingProject) {
+      const idx = projects.findIndex(p => p.name === editingProject);
+      if (idx !== -1) {
+        projects[idx] = {
+          name: editingProject,
+          size: currentGridSize,
+          cells: Array.from(grid.children).map(c => c.style.backgroundColor)
+        };
+        setProjects(projects);
+        alert(`Project "${editingProject}" updated.`);
+      }
+    } else {
+      if (!nameInput) return alert("Enter a project name.");
+      if (projects.some(p => p.name === nameInput)) {
+        return alert("That name’s already taken.");
+      }
+      projects.push({
+        name: nameInput,
+        size: currentGridSize,
+        cells: Array.from(grid.children).map(c => c.style.backgroundColor)
+      });
+      setProjects(projects);
+      alert(`Project "${nameInput}" saved.`);
+    }
+  });
+
+  goToProjectsBtn.addEventListener("click", () => {
+    window.location.href = "projects.html";
+  });
+
+  // Load existing project if any
+  const toLoad = localStorage.getItem("currentProjectName");
+  if (toLoad) {
+    const p = getProjects().find(x => x.name === toLoad);
+    if (p) {
+      editingProject = toLoad;
+      projectNameInput.value = toLoad;
+      projectNameInput.disabled = true;
+      currentGridSize = p.size;
+      gridSizeInput.value = p.size;
+      createGrid(p.size);
+      p.cells.forEach((col,i) => {
+        grid.children[i].style.backgroundColor = col;
+      });
+    }
+    localStorage.removeItem("currentProjectName");
+  } else {
+    createGrid(currentGridSize);
+  }
 });

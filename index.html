@@ -1,32 +1,58 @@
 <!DOCTYPE html>
+<html>
 <head>
   <title>Pixel Art Editor</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Pixel Art Editor</h1>
+  <div class="container">
+    <header>
+      <h1>Pixel Art Editor</h1>
+    </header>
 
-  <div class="controls">
-    <label for="colorPicker">Pick a color:</label>
-    <input type="color" id="colorPicker" value="#000000">
+    <section class="controls card">
+      <div class="field">
+        <label for="colorPicker">Color</label>
+        <input type="color" id="colorPicker" value="#000000">
+      </div>
+      <div class="field">
+        <label for="toolSelect">Tool</label>
+        <select id="toolSelect">
+          <option value="brush" selected>Brush</option>
+          <option value="eraser">Eraser</option>
+          <option value="fill">Fill</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="brushSizeInput">Size</label>
+        <input type="number" id="brushSizeInput" value="1" min="1" max="10">
+      </div>
+      <div class="field">
+        <label for="gridSizeInput">Grid</label>
+        <input type="number" id="gridSizeInput" value="32" min="5" max="64">
+      </div>
+      <button id="resizeBtn">Resize</button>
+      <button id="toggleGridBtn">Toggle Lines</button>
+      <button id="clearBtn">Clear</button>
+      <button id="undoBtn">Undo</button>
+      <button id="redoBtn">Redo</button>
+      <button id="saveBtn">Save PNG</button>
+    </section>
 
-    <label for="toolSelect">Tool:</label>
-    <select id="toolSelect">
-      <option value="brush" selected>Brush</option>
-      <option value="eraser">Eraser</option>
-      <option value="fill">Fill</option>
-    </select>
+    <section class="project-save card">
+      <div class="field">
+        <label for="projectNameInput">Project Name</label>
+        <input type="text" id="projectNameInput" placeholder="Enter project name">
+      </div>
+      <button id="saveNewProjectBtn">Save Project</button>
+      <button id="goToProjectsBtn">My Projects</button>
+    </section>
 
-    <label for="gridSizeInput">Grid size:</label>
-    <input type="number" id="gridSizeInput" value="16" min="5" max="64">
-    <button id="resizeBtn">Resize Grid</button>
-
-    <button id="toggleGridBtn">Toggle Grid Lines</button>
-    <button id="saveBtn">Save Image</button>
-    <button id="clearBtn">Clear</button>
+    <main>
+      <div id="grid" class="grid-card"></div>
+    </main>
   </div>
-
-  <div id="grid"></div>
 
   <script src="script.js"></script>
 </body>

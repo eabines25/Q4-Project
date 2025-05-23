@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Pixel Art Projects</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header><h1>My Projects</h1></header>
+    <section class="card controls">
+      <button id="backBtn">Back to Editor</button>
+    </section>
+    <section class="projects-gallery" id="gallery"></section>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const gallery = document.getElementById("gallery");
+      const backBtn = document.getElementById("backBtn");
+      const STORAGE_KEY = "pixelArtProjects";
+
+      function getProjects() {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      }
+      function setProjects(arr) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+      }
+
+      function render() {
+        gallery.innerHTML = "";
+        getProjects().forEach(project => {
+          const card = document.createElement("div");
+          card.className = "project-card";
+
+          // thumbnail
+          const canvas = document.createElement("canvas");
+          const previewSize = 150;
+          canvas.width  = previewSize;
+          canvas.height = previewSize;
+          const ctx = canvas.getContext("2d");
+          const cellSize = previewSize / project.size;
+          project.cells.forEach((col, i) => {
+            const row = Math.floor(i / project.size);
+            const c   = i % project.size;
+            ctx.fillStyle = col || "#fff";
+            ctx.fillRect(c * cellSize, row * cellSize, cellSize, cellSize);
+          });
+
+          // title
+          const title = document.createElement("h3");
+          title.textContent = project.name;
+
+          // open button
+          const openBtn = document.createElement("button");
+          openBtn.textContent = "Open";
+          openBtn.addEventListener("click", () => {
+            localStorage.setItem("currentProjectName", project.name);
+            window.location.href = "index.html";
+          });
+
+          // delete button
+          const delBtn = document.createElement("button");
+          delBtn.textContent = "Delete";
+          delBtn.addEventListener("click", () => {
+            if (!confirm(`Delete "${project.name}"?`)) return;
+            const updated = getProjects().filter(p => p.name !== project.name);
+            setProjects(updated);
+            render();
+          });
+
+          card.appendChild(canvas);
+          card.appendChild(title);
+          card.appendChild(openBtn);
+          card.appendChild(delBtn);
+          gallery.appendChild(card);
+        });
+      }
+
+      backBtn.addEventListener("click", () => {
+        window.location.href = "index.html";
+      });
+
+      render();
+    });
+  </script>
+</body>
+</html>
